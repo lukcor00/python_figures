@@ -4,7 +4,7 @@ from matplotlib import rcParams
 import matplotlib.ticker as ticker
 
 def basic_style():
-    rcParams.update({
+    plt.style.use({
         'font.family': 'serif',         
         'font.serif': 'Times New Roman',
         'font.size': 14,                
@@ -44,6 +44,8 @@ def set_limits(ax, xlim=None, ylim=None):
 def set_legend(ax):
     ax.legend()
  
+def set_grid(ax):
+    ax.grid()
 
 def main():
     
