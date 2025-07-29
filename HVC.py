@@ -21,7 +21,7 @@ def prepare_point_data(X, Y):
 def style(ax):
     main_style_config = {}
     x_tick, y_tick = 1, 10
-    x_lim, y_lim = (0, 8), (40, 140)
+    x_lim, y_lim = (0, 8), (0, 140)
     st.basic_style()
     st.main_style(main_style_config)
     st.set_ticks(ax, x_tick, y_tick)

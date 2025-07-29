@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from src import styles as st
 from src import utils as ut
 from pathlib import Path
+from pprint import pprint
 
 def convert_to_mmHg(p):
     return -p*1035*1000/13600/9.81
@@ -58,6 +59,8 @@ def export_figures(input, export_dir="figures/"):
     data, keys, data_enumeration = input
     for i in keys.keys():
         for j in keys[i]:
+            if len(j) < 6:
+                continue
             for k in j:
                 clor = data_enumeration[k]
                 if "ЛН" in clor:
@@ -77,6 +80,40 @@ def export_figures(input, export_dir="figures/"):
             plt.savefig(f"{export_dir}/{i}{data_enumeration[j[0]]}_scaled")
             plt.cla()
         # plt.show()
+
+def export_figures_rows(input, export_dir="figures/"):
+    data, keys, data_enumeration = input
+    for i in keys.keys():
+        x_tick, y_tick = 1, 10
+        x_lim, y_lim = (0, 6), (40, 120)
+        fig, axs = plt.subplots(5, 1, figsize=(8.268, 11.693*1.1))
+        counter = 0
+        for j in keys[i]:
+            ax = axs[counter]
+            if len(j) < 6:
+                continue        
+            for k in j:
+                clor = data_enumeration[k]
+                if "ЛН" in clor:
+                    clor = clor[:-3]
+                clor = clor[1:]
+                clor = int(clor)
+                red = clor % 5 * 35/255
+                green = clor % 7 * 25/255
+                blue = clor % 3 * 56/255
+                if "ЛН" in data_enumeration[k]:
+                    ax.plot(data[k][0], data[k][1], linewidth=2, label=data_enumeration[k], color=(red+0.3, green+0.3, blue+0.3), linestyle='--')
+                else:
+                    ax.plot(data[k][0], data[k][1], label=data_enumeration[k], color=(red, green, blue))
+            ax.plot([1.8], [77], marker="X", markersize=10, linestyle='None',     label='Раб. Т')
+            ax.set_ylabel(r'$\Delta p$, мм рт.ст.')
+            st.set_ticks(ax, x_tick, y_tick)
+            st.set_limits(ax, x_lim, y_lim)
+            counter += 1
+            st.set_legend(ax)
+        ax.set_xlabel(r'$\dot{V}$, л/мин')
+        plt.savefig(f"{export_dir}/{i}_5")
+        plt.show()  
 
 def scale_to_regime(coeffs, f1, point, max_power):
     X = point[0] 
@@ -110,15 +147,17 @@ prepared_data = {}
 prepared_data_linear = {}
 f = []
 equation_export_data = []
+linear_MAX = 3
+linear_MIN = 0.3
 for i in INPUT_DATA_SORTED_KEYS:
     X, Y = prepare_point_data(INPUT_DATA[i][0], INPUT_DATA[i][1])
     polynom_coeffs = ut.execute(Y, X)
+    # equation = f"{INPUT_DATA_SORTED_ENUMERATION[i]}\tP = {polynom_coeffs[0]:.2f} + {polynom_coeffs[1]:.2f}*V + {polynom_coeffs[2]:.2f}*(V)^2 + {polynom_coeffs[3]:.2f}*(V)^3"
+    # equation_export_data.append(equation)
     polynom_coeffs, f2 = scale_to_regime(polynom_coeffs, 10000, [1.8, 77], 3)
     f.append(f2)
-    equation = f"P = {polynom_coeffs[0]} + {polynom_coeffs[1]}*V + {polynom_coeffs[2]}*(V)^2 + {polynom_coeffs[3]}*(V)^3"
-    equation_export_data.append(equation)
     X_approx = np.arange(0, 8, 0.4)
-    X_linear_approx = np.arange(0.3, 3, 0.3)
+    X_linear_approx = np.arange(linear_MIN, linear_MAX, 0.1)
     Y_approx = []
     Y_linear_approx = []
     for point in X_approx:
@@ -128,30 +167,47 @@ for i in INPUT_DATA_SORTED_KEYS:
     prepared_data[i] = [X_approx, Y_approx]
     prepared_data_linear[i] = [X_linear_approx, Y_linear_approx]
 
-for i in range(len(f)):
-    print(f'{equation_export_data[i]:.2f}\t{str(f[i]):.2f}')
+for i in INPUT_DATA_SORTED_KEYS:
+    X, Y = prepare_point_data(INPUT_DATA[i][0], INPUT_DATA[i][1])
+    polynom_coeffs = ut.execute(Y/10**8, X/10**4)
+    equation = f"{INPUT_DATA_SORTED_ENUMERATION[i]}\tP = {polynom_coeffs[0]:.2e} + {polynom_coeffs[1]:.2e}*V + {polynom_coeffs[2]:.2f}*(V)^2 + {polynom_coeffs[3]:.2f}*(V)^3"
+    equation_export_data.append(equation)
+
+with open('equtaions.txt', 'w', encoding="utf-8") as file:
+    for i in range(len(f)):
+        file.write(f'{equation_export_data[i]}\t{round(f[i]*2, -3)/2}\n')
 
 linear_data = {}
+linear_export_data = []
 for i in INPUT_DATA_SORTED_KEYS:
     X, Y = prepared_data_linear[i][0], prepared_data_linear[i][1]
     polynom_coeffs = ut.execute(Y, X, polinom_power=1)
-    X_approx = np.arange(0.3, 3, 0.3)
+    X_approx = np.arange(linear_MIN, linear_MAX, 0.1)
     Y_approx = []
+    linear_export_data.append(f'{i[0:-1]}\t{polynom_coeffs[-1]}')
     new_key = i + "ЛН"
     for point in X_approx:
         Y_approx.append(ut.calculate_polynom(point, polynom_coeffs))
     linear_data[new_key] = [X_approx, Y_approx]
 
+with open('linear_approx.txt', 'w', encoding="utf-8") as file:
+    for i in range(len(f)):
+        file.write(f'{linear_export_data[i]}')
+
+with open('linear_approx_3d.txt', 'w', encoding="utf-8") as file:
+    for i in range(len(f)):
+        file.write(f'{linear_export_data[i]}\t{round(f[i]*2, -3)/2}\n')
+
 export_keys = {}
 export_keys["SD"] = one_param_sample(INPUT_DATA_SORTED_KEYS, 6, 8)
-export_keys["HD"] = one_param_sample(INPUT_DATA_SORTED_KEYS, 8, 10)
+export_keys["HD"] = one_param_sample(INPUT_DATA_SORTED_KEYS, 9, 11) 
 export_keys["HPhi"] = one_param_sample(INPUT_DATA_SORTED_KEYS, -3, -1)
-
+pprint(export_keys)
 export_data = linear_data | prepared_data
 for counter, i in enumerate(linear_data.keys()): 
     INPUT_DATA_SORTED_ENUMERATION[i] = f"№{counter+1} ЛН"
     INPUT_DATA_SORTED_KEYS.append(i)
 
+# export_figures_rows([export_data, export_keys, INPUT_DATA_SORTED_ENUMERATION])
 export_figures([export_data, export_keys, INPUT_DATA_SORTED_ENUMERATION])
-
 # %%
